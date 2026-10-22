@@ -12,13 +12,11 @@ y2 = 120
 x3 = 800
 y3 = 600
 
-t : float = 0
+t: float = 0
 
 def bezier_cubo (t:float):
     x: float = pow ( 1 - t, 3) * x0 + 3 * pow (1 - t, 2) * t * x1 + 3 * (1 - t) * pow (t,2) * x2 + pow(t,3) * x3
     y: float = pow (1 -t, 3) * y0 + 3 * pow (1 - t, 2) * t * y1 + 3 * (1 - t) * pow (t , 2) * y2 + pow( t, 3) * y3
-
-
 mapa = [
     [16,16,16,16,16],
     [16,16,16,16,16],
@@ -27,6 +25,7 @@ mapa = [
     [16,16,16,16,16]
 ]
 
+spr = sprite.Sprite (x0,y0,"imagen1.jpg")
 
 pygame.init()
 SCREEN_WIDTH = 800
@@ -62,28 +61,22 @@ while gameRunning == True:
     screen.fill((0, 0, 0)) # Colorea la pantalla de negro para refrescar los pixeles viejos.
 
    ## tile_x, tile_y = tile_map.obtengo_coordenada_tile(17)
-    
-    for renglon in mapa:
-        for indice in renglon:
-            tile_x, tile_y = tile_map.obtengo_coordenada_tile(indice)
-            screen.blit (tile_map.tileset, (0, 0), (tile_x ,0, tile_map.tile_width, tile_map.tite_height))
-            coord_x = coord_x + tile_map.tile_width
-        coord_x = 0
-        coord_y = coord_y + tile_map.tile_height
-    
-   #  screen.blit (tile_map.tileset, (0, 0), (tile_x ,0, tile_map.tile_width, tile_map.tite_height))   # Carga la imagen en pantalla
-   
-   
-    spr.x , spr.y = bezier_cubo (t)
-    
-    spr = sprite.Sprite (x0,y0,"imagen1.jpg")
-    
-    # screen. blit (spr.image, (spr.x, spr.y)) Clase 20/10/2026
+    """
+        for renglon in mapa:
+            for indice in renglon:
+                tile_x, tile_y = tile_map.obtengo_coordenada_tile(indice)
+                screen.blit (tile_map.tileset, (0, 0), (tile_x ,0, tile_map.tile_width, tile_map.tite_height))
+                coord_x = coord_x + tile_map.tile_width
+            coord_x = 0
+            coord_y = coord_y + tile_map.tile_height
+
+    screen.blit (tile_map.tileset, (0, 0), (tile_x ,0, tile_map.tile_width, tile_map.tite_height))   # Carga la imagen en pantalla
+    """
+    spr.x, spr.y = bezier_cubo (t)
     
     t = t + 0.0001
-    if (t >= 1):
+    if t >= 1:
         t = 1
-    
     pygame.display.flip()
 
     fps += 1                                    # Contador de fps
