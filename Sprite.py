@@ -105,4 +105,13 @@ class SpriteAnimado(Sprite):
         # Validar que la lista tenga imagenes
         return self.lista_imagenes[self.indice_actual]
 
+    def incremento_Cont(self):
+        self.cont +=1
+        if self.cont >= self.cambio:
+            self.cont = 0
+        
+        self.indice_actual += 1
+        
+        if self.indice_actual >= len (self.lista_imagenes):
+            self.indice_actual = 0
     
