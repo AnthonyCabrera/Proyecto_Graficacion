@@ -6,7 +6,8 @@ from Navegacion import buscar_ruta, obtener_puntos_ruta
 
 class Personaje(SpriteAnimado):
 
-    def __init__(self, x, y, rutas_imagenes, velocidad=160, tiempo_frame=0.15):
+    def __init__(self, x, y, rutas_imagenes, velocidad=160, tiempo_frame=0.15,
+                 funcion_curva=None):
         super().__init__(x, y)
         if velocidad <= 0 or tiempo_frame <= 0:
             raise ValueError("La velocidad y el tiempo por imagen deben ser positivos.")
@@ -14,6 +15,8 @@ class Personaje(SpriteAnimado):
         self.cambio = tiempo_frame
         self.indice_actual = 0
         self.ruta = []
+        self.funcion_curva = funcion_curva
+        self.movimiento_curvo = funcion_curva is not None
         self.cargar_animacion(rutas_imagenes)
 
     def cargar_animacion(self, rutas_imagenes):
@@ -99,7 +102,89 @@ class Personaje(SpriteAnimado):
             if punto != anterior:
                 self.ruta.append(punto)
                 anterior = punto
+        if self.movimiento_curvo and self.ruta:
+            self.ruta = self.crear_ruta_curva((centro_x, centro_y),
+                                             self.ruta, tilemap)
         return True
+
+    def alternar_movimiento(self, tilemap):
+        if self.funcion_curva is None:
+            return
+        self.movimiento_curvo = not self.movimiento_curvo
+        if self.ruta:
+            self.establecer_destino(*self.ruta[-1], tilemap)
+
+    def muestrear_curva(self, p0, p1, p2, p3):
+        # Tramos de hasta 4 pixeles: el recorrido conserva la velocidad habitual
+        # y el sistema de colisiones revisa tambien los pasos de la curva.
+        longitud = sum(math.dist(a, b)
+                       for a, b in ((p0, p1), (p1, p2), (p2, p3)))
+        pasos = max(1, math.ceil(longitud / 4))
+        return [self.funcion_curva(i / pasos, p0, p1, p2, p3)
+                for i in range(1, pasos + 1)]
+
+    def trayecto_libre(self, inicio, puntos, tilemap):
+        anterior_x, anterior_y = inicio
+        for x, y in puntos:
+            if self.hay_solidos(tilemap,
+                                min(anterior_x, x) - self.ancho / 2,
+                                min(anterior_y, y) - self.alto / 2,
+                                max(anterior_x, x) + self.ancho / 2,
+                                max(anterior_y, y) + self.alto / 2):
+                return False
+            anterior_x, anterior_y = x, y
+        return True
+
+    def crear_ruta_curva(self, inicio, puntos, tilemap):
+        destino = puntos[-1]
+        dx, dy = destino[0] - inicio[0], destino[1] - inicio[1]
+        distancia = math.hypot(dx, dy)
+        if distancia == 0:
+            return puntos
+
+        # En espacios abiertos usa un arco hasta el clic. Prueba ambos lados
+        # y reduce su amplitud si hay paredes cerca.
+        amplitud = min(distancia / 4, tilemap.tile_witdh)
+        for factor in (1, -1, 0.5, -0.5, 0.25, -0.25):
+            offset_x = -dy / distancia * amplitud * factor
+            offset_y = dx / distancia * amplitud * factor
+            p1 = (inicio[0] + dx / 3 + offset_x,
+                  inicio[1] + dy / 3 + offset_y)
+            p2 = (inicio[0] + 2 * dx / 3 + offset_x,
+                  inicio[1] + 2 * dy / 3 + offset_y)
+            curva = self.muestrear_curva(inicio, p1, p2, destino)
+            if self.trayecto_libre(inicio, curva, tilemap):
+                return curva
+
+        # Si debe rodear obstaculos, conserva la ruta y redondea sus giros.
+        esquinas = [inicio]
+        for i, punto in enumerate(puntos[:-1]):
+            anterior, siguiente = esquinas[-1], puntos[i + 1]
+            entrada = (punto[0] - anterior[0], punto[1] - anterior[1])
+            salida = (siguiente[0] - punto[0], siguiente[1] - punto[1])
+            if (abs(entrada[0] * salida[1] - entrada[1] * salida[0]) > 1e-6
+                    or entrada[0] * salida[0] + entrada[1] * salida[1] <= 0):
+                esquinas.append(punto)
+        esquinas.append(destino)
+        ruta = []
+        for i in range(1, len(esquinas) - 1):
+            anterior, esquina, siguiente = esquinas[i - 1:i + 2]
+            largo_entrada = math.dist(anterior, esquina)
+            largo_salida = math.dist(esquina, siguiente)
+            radio = min(largo_entrada / 2, largo_salida / 2,
+                        min(tilemap.tile_witdh, tilemap.tile_height) * 0.4)
+            entrada = tuple(esquina[j] + (anterior[j] - esquina[j])
+                            * radio / largo_entrada for j in (0, 1))
+            salida = tuple(esquina[j] + (siguiente[j] - esquina[j])
+                           * radio / largo_salida for j in (0, 1))
+            curva = self.muestrear_curva(entrada, esquina, esquina, salida)
+            tramo = [entrada] + curva
+            if self.trayecto_libre(ruta[-1] if ruta else inicio, tramo, tilemap):
+                ruta.extend(tramo)
+            else:
+                ruta.append(esquina)
+        ruta.append(destino)
+        return ruta
 
     def procesar_evento(self, evento, tilemap):
         if evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
